@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/png" href="./images/mlg-logo.png">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content="Supervised Fine Tuning Mistral 7B">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    <title>Supervised Fine Tuning Mistral 7B</title>
+    <link rel="stylesheet" href="./styles.css">
+
+    <script>
+      function openNav() {
+          document.getElementById("navPanel").style.width = "275px";
+          document.getElementById("navPanel").style.paddingRight = "10px";
+          document.getElementById("mainContent").style.paddingLeft = "300px";
+          document.getElementById("openNavBtn").style.display = "none";
+          document.getElementById("openNavBtn").style.marginLeft = "-2em";
+      }
+  
+      function closeNav() {
+          document.getElementById("navPanel").style.width = "0";
+          document.getElementById("navPanel").style.paddingRight = "0";
+          document.getElementById("mainContent").style.paddingLeft = "0";
+          document.getElementById("openNavBtn").style.display = "block";
+          setTimeout(() => {
+            document.getElementById("openNavBtn").style.marginLeft = "0";
+          }, 0.5*0.3*1000 /* sec */);
+      }
+
+      document.addEventListener("DOMContentLoaded", function() {
+        const navPanel = document.getElementById('navPanel');
+        if (!navPanel) {
+          return;
+        }
+        const anchors = navPanel.getElementsByTagName('a');
+        for (let i=0; i<anchors.length; i++) {
+          const target = anchors[i];
+          target.onclick = () => {
+            const navPanel = document.getElementById('navPanel');
+            if (!navPanel) {
+              return;
+            }
+            const anchors = navPanel.getElementsByTagName('a');
+            for (let i=0; i<anchors.length; i++) {
+              const a = anchors[i];
+              a.classList.remove('selected');
+            }
+            target.classList.add('selected');
+
+            if (window.innerWidth <= 600) {
+              closeNav();
+            }
+          };
+        }
+      });
+    </script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" integrity="sha384-wcIxkf4k558AjM3Yz3BBFQUbk/zgIYC2R0QpeeYb+TwlBVMrlgLqwRjRtGZiK7ww" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" integrity="sha384-hIoBPJpTUs74ddyc4bFZSM1TVlQDA60VBbJS0oA934VSz82sBx1X7kSx2ATBDIyd" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+              // customised options
+              // • auto-render specific keys, e.g.:
+              delimiters: [
+                  {left: '$$', right: '$$', display: true},
+                  {left: '$', right: '$', display: false},
+                  {left: '\\(', right: '\\)', display: false},
+                  {left: '\\[', right: '\\]', display: true}
+              ],
+              // • rendering keys, e.g.:
+              throwOnError : false,
+            });
+        });
+    </script>
+  </head>
+  <body>
+    <nav id="navPanel">
+      <button class="closeBtn" onclick="closeNav()">&times;</button>
+      <ul>
+      <li><a href="#supervised-fine-tuning-mistral-7b"
+      id="toc-supervised-fine-tuning-mistral-7b">Supervised Fine Tuning
+      Mistral 7B</a>
+      <ul>
+      <li><a href="#dominic-kramer" id="toc-dominic-kramer">Dominic
+      Kramer</a></li>
+      <li><a href="#finding-compute" id="toc-finding-compute">Finding
+      Compute</a></li>
+      <li><a href="#vast.ai" id="toc-vast.ai">Vast.ai</a></li>
+      <li><a href="#performing-supervised-fine-tuning"
+      id="toc-performing-supervised-fine-tuning">Performing Supervised
+      Fine Tuning</a></li>
+      <li><a href="#adding-observability"
+      id="toc-adding-observability">Adding Observability</a></li>
+      <li><a href="#setting-up-the-training-data"
+      id="toc-setting-up-the-training-data">Setting Up the Training
+      Data</a></li>
+      <li><a href="#training" id="toc-training">Training</a></li>
+      <li><a href="#saving-the-model" id="toc-saving-the-model">Saving
+      the Model</a></li>
+      <li><a href="#loading-the-model"
+      id="toc-loading-the-model">Loading the Model</a></li>
+      <li><a href="#running-the-model"
+      id="toc-running-the-model">Running the Model</a></li>
+      <li><a href="#conclusion" id="toc-conclusion">Conclusion</a></li>
+      </ul></li>
+      </ul>
+    </nav>
+  
+    <div id="mainContent">
+        <button id="openNavBtn" onclick="openNav()">&#9776;</button>
+        <h1 id="supervised-fine-tuning-mistral-7b">Supervised Fine
+        Tuning Mistral 7B</h1>
+        <h3 id="dominic-kramer">Dominic Kramer</h3>
+        <p>In this article I will demonstrate how to perform supervised
+        fine tuning on version 0.1 of the Mistral 7B model. This is the
+        first step needed to align the model, and depending on your
+        needs may be sufficient for alignment. Follow-up work could
+        involve further aligning the model using Direct Preference
+        Optimization (DPO).</p>
+        <p>This article replicates and exapnds on the directions in the
+        <a
+        href="https://colab.research.google.com/drive/1WNSVtM82oknmzL1QrJlNu--yNaWbp6o9?usp=sharing&amp;utm_campaign=Events%20Follow%20Up&amp;utm_source=hs_email&amp;utm_medium=email&amp;_hsenc=p2ANqtz--zYcYKj9_o5fLbt_D3P4tzLanpAyfFm14Z2NXEvCZxbsjLtax9y5mYCzRg-opvXZhsYGEH#scrollTo=7F9-BH4g9sr9">Supervised
+        fine-tuning (SFT) of an LLM</a> document from HuggingFace.
+        Before reading this document, I recommend you read the
+        HuggingFace document.</p>
+        <p>Some of the code blocks in this document are copied from
+        those in original document so that you can easily follow along
+        and see what changes I made to the original code.</p>
+        <p>Further, this article expands on the Supervised fine-tuning
+        (SFT) of an LLM article by providing additional information with
+        my experience performing supervised fine tuing on Mistral
+        7B.</p>
+        <p>In particular, I go into detail about the compute I used to
+        perform the supervised fine tuning, which compute provider I
+        used, how I added observability to the referenced code, timing
+        and cost information, as well as descriptions of changes I
+        needed to do to the reference code to get it working.</p>
+        <h2 id="finding-compute">Finding Compute</h2>
+        <p>To get started, I needed to find compute that I could use to
+        perform the supervised fine tuning since I don’t myself have any
+        NVIDIA cards. Following the recommendation of the original
+        document, I needed to use either an NVIDIA RTX 3090 or 4090 or a
+        NVIDIA A100, H100, or H200.</p>
+        <p>This is because those GPUs use the Ampere architecture that
+        is needed because the code in the original document uses the
+        <code>bfloat16</code> number format.</p>
+        <p>A Google search showed that an A100 costs in the area of
+        $10,000 and an H100 in the area of $25,000 while a RTX 4090
+        still costs around $2000 (all USD). Thus, I decided to rent
+        compute.</p>
+        <p>There were several offerings I tried, but in the end I
+        decided to use <a href="https://cloud.vast.ai/">vast.ai</a>
+        since their pricing was transparent and competative, their user
+        interface was easy to use, and they supported easily interacting
+        with the rented compute using a Jupyter notebook interface.</p>
+        <h2 id="vast.ai">Vast.ai</h2>
+        <p>I wanted to make sure the compute I selected and the
+        configuration I used matched as closely as possible as the
+        compute used in the original document since I didn’t want to set
+        everything up and be training for a long period of time only to
+        discover my configuration was incorrect.</p>
+        <p>Thus, after creating an account, I created a new template
+        with the image path/tag as
+        <code>pytorch/pytorch:2.1.2-cuda11.8-cudnn8-devel</code> and the
+        version as <code>2.1.2-cuda11.8-cudann8-devel</code>. I selected
+        those because they had the newest version of pytorch and cuda
+        and the selection of <code>devel</code> meant that the image
+        came with all of the NVIDIA development tools. I wasn’t sure
+        which ones I would need, but I would rather have them all in
+        case I needed them later.</p>
+        <p>Next, I set the Launch Mode to “Run a jupyter-python
+        notebook” because I wanted to interact with the compute using a
+        Jupyter notebook and selected “Jupyter direct HTTPS - much
+        faster, but requires first loading our TLS certificate in your
+        browser (one-time).” since it would be more preformant.</p>
+        <p>Because I used the Jupyter direct HTTPS option, I needed to
+        make sure my computer was configured to use the TLS
+        certificates. I found and followed the official documentation <a
+        href="https://vast.ai/docs/instance-setup/jupyter">here</a>, but
+        if I hadn’t found it, after selecting an actual compute
+        instance, I would have been presented with a link to the
+        necessary documentation.</p>
+        <p>After creating a template, I needed to rent an instance which
+        is a machine that contains the actual compute. To do so, I
+        clicked on the “Search” item from the vast.ai console to see my
+        options.</p>
+        <p>To ensure a smooth experience, I decided to use the same
+        compute that the author of the original HuggingFace document
+        used, an NVIDIA RTX 4090, taking note that it needed to have at
+        least 24GB of memory. This is key because if you don’t have at
+        least 24GB of memory, you either won’t be able to train your
+        model, or if you do, you will get errors trying to load your
+        newly trained model saying that the model won’t fit in
+        memory.</p>
+        <p>Using the search filters, I filtered to look for only NVIDIA
+        RTX cards and sort by price. When selecting an instance I looked
+        for a few things:</p>
+        <ol type="1">
+        <li>Type: The instance needed to use an NVIDIA RTX 4090.</li>
+        <li>Cost: I didn’t want to pay more than I needed to.</li>
+        <li>Reliability: I didn’t want the instance to fail in the
+        middle of training.</li>
+        <li>Memory: The instance needed to have at least 24GB of per-GPU
+        RAM.</li>
+        <li>Network speed: The instance needed to have good download and
+        upload speeds because I would be downloading the model weights
+        when done training (or uploading them the instance if I was
+        trying out an already trained model).</li>
+        <li>Max CUDA version: The instance needed to support the version
+        of CUDA that my template used.</li>
+        <li>Speed: The higher the TFLOPS the less time my training would
+        take.</li>
+        </ol>
+        <p>Based on these criteria, when I was looking for compute, I
+        found that ~$0.40 USD per hour was an average cost. I’m sure
+        this cost fluctuates. It was nice that hovering over an instance
+        would pull up a popup that showed the total daily cost including
+        compute and storage.</p>
+        <p>One time I rented an instance that was advertised as having
+        24GB of RAM but actually didn’t which was problematic since my
+        training failed with out-of-memory errors and I needed to start
+        over. So, again, make sure after you rent the instance it has
+        enough RAM on the GPU.</p>
+        <p>Note that after selecting an instance it can load in minutes
+        or hours. Usually what I would do is if the instance didn’t load
+        in about 10 minutes, I would destroy it and rent a different
+        instance.</p>
+        <p>Also note that stopping an instance doesn’t stop billing for
+        the instance. If you want to make sure you are not being billed
+        for the instance, make sure you destroy it.</p>
+        <p>Last, I wasn’t sure how much hard drive space I would need,
+        but since at least 24GB of video RAM was needed, I went with
+        around one and a half times that space for disk space and
+        selected 40GB. Again, I didn’t want to have the training
+        complete but not save the weights because I was out of disk
+        space.</p>
+        <p>After the instance loaded, I was able to launch the Jupyter
+        notebook interface and get started. To do so, I downloaded the
+        <a
+        href="https://colab.research.google.com/drive/1WNSVtM82oknmzL1QrJlNu--yNaWbp6o9?usp=sharing&amp;utm_campaign=Events%20Follow%20Up&amp;utm_source=hs_email&amp;utm_medium=email&amp;_hsenc=p2ANqtz--zYcYKj9_o5fLbt_D3P4tzLanpAyfFm14Z2NXEvCZxbsjLtax9y5mYCzRg-opvXZhsYGEH#scrollTo=7F9-BH4g9sr9">Supervised
+        fine-tuning (SFT) of an LLM</a> notebook to my local computer
+        and uploaded it to the instance using Jupyter’s web
+        interface.</p>
+        <h2 id="performing-supervised-fine-tuning">Performing Supervised
+        Fine Tuning</h2>
+        <p>To perform the training I followed the original HuggingFace
+        document directly but came accross a few problems.</p>
+        <p>First, I had problems accessing HuggingFace models. In
+        particular, the code:</p>
+        <div class="sourceCode" id="cb1"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoTokenizer</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>model_id <span class="op">=</span> <span class="st">&quot;mistralai/Mistral-7B-v0.1&quot;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(model_id)</span></code></pre></div>
+        <p>would fail saying that I don’t have access to the model that
+        was needed to create the tokenizer. I found the solution to this
+        problem was to supply a HuggingFace access token to the
+        <code>AutoTokenizer.from_pretrained()</code> method.</p>
+        <p>Specifically, I logged into <a
+        href="https://huggingface.co/">HuggingFace</a>, clicked on
+        Settings from the dropdown menu in the top-right corner, and
+        clicked on Access Tokens. From there I could generate a new
+        Access Token.</p>
+        <p>I then stored the Access Token in my notebook in a new
+        variable</p>
+        <div class="sourceCode" id="cb2"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>HUGGING_FACE_ACCESS_TOKEN<span class="op">=</span><span class="st">&quot;&lt;copied access token&gt;&quot;</span></span></code></pre></div>
+        <blockquote>
+        <p>Note storing the access token directly in the notebook is
+        risky because the person I’m renting the compute from could look
+        at my notebok and get my token. However, I used an instance from
+        a Trusted Datacenter, and after I was done running my notebook I
+        immediately revoked my token.</p>
+        </blockquote>
+        <blockquote>
+        <p>In retrospect, I think I could have done the following to
+        login to mitigate this risk:</p>
+        </blockquote>
+        <div class="sourceCode" id="cb3"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>pip install huggingface_hub</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> huggingface_hub <span class="im">import</span> notebook_login</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>notebook_login()</span></code></pre></div>
+        <p>Then I updated the code to use the token:</p>
+        <div class="sourceCode" id="cb4"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>```python</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoTokenizer</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>model_id <span class="op">=</span> <span class="st">&quot;mistralai/Mistral-7B-v0.1&quot;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  model_id,</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  token<span class="op">=</span>HUGGING_FACE_ACCESS_TOKEN) <span class="co"># &lt;-- this line is new</span></span></code></pre></div>
+        <p>at which point I could access the model.</p>
+        <p>Later, I found that the trainer had access errors when I
+        tried to run it and identified that I needed to pass the token
+        to the model keyword arguments. Thus, I updated the code:</p>
+        <div class="sourceCode" id="cb5"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>model_kwargs <span class="op">=</span> <span class="bu">dict</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    attn_implementation<span class="op">=</span><span class="st">&quot;flash_attention_2&quot;</span>, <span class="co"># set this to True if your GPU supports it (Flash Attention drastically speeds up model computations)</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    torch_dtype<span class="op">=</span><span class="st">&quot;auto&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    use_cache<span class="op">=</span><span class="va">False</span>, <span class="co"># set to False as we&#39;re going to use gradient checkpointing</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    device_map<span class="op">=</span>device_map,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    quantization_config<span class="op">=</span>quantization_config</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+        <p>to</p>
+        <div class="sourceCode" id="cb6"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>model_kwargs <span class="op">=</span> <span class="bu">dict</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    attn_implementation<span class="op">=</span><span class="st">&quot;flash_attention_2&quot;</span>, <span class="co"># set this to True if your GPU supports it (Flash Attention drastically speeds up model computations)</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    torch_dtype<span class="op">=</span><span class="st">&quot;auto&quot;</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    use_cache<span class="op">=</span><span class="va">False</span>, <span class="co"># set to False as we&#39;re going to use gradient checkpointing</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    device_map<span class="op">=</span>device_map,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    quantization_config<span class="op">=</span>quantization_config,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    token<span class="op">=</span>HUGGING_FACE_ACCESS_TOKEN <span class="co"># &lt;-- this line is new</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+        <p>After making these changes, I was able to start training.
+        However, it was hard to see what progress was being made.</p>
+        <h2 id="adding-observability">Adding Observability</h2>
+        <p>To be able to understand if the loss was decreasing as I
+        wanted it to, I decided to add observability to the code.</p>
+        <p>There are many platforms that allow you to perform live
+        tracking of model parameters, and I decided to use <a
+        href="https://wandb.ai">Weights and Biases</a>.</p>
+        <p>I already had a Weights and Biases account, and so to get
+        started I ran a new cell in the notebook:</p>
+        <div class="sourceCode" id="cb7"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>pip install wandb</span></code></pre></div>
+        <p>to install Weights and Biases Python package. I then ran the
+        following newly added cell to login:</p>
+        <div class="sourceCode" id="cb8"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> wandb</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>wandb.login()</span></code></pre></div>
+        <p>To login, I needed to paste and API key from my Weights and
+        Biases account. To get such a key, I logged into <a
+        href="https://wandb.ai">Weights and Biases</a>, clicked on my
+        name in the top-right corner, selected “User settings”, scrolled
+        down to “Danger Zone API Keys” and created a new key.</p>
+        <blockquote>
+        <p>Note: Just as with the HuggingFace access token, it is risky
+        to use an access token in a notebook running on someone else’s
+        machine since they could steal the token. For me, again, I was
+        using a trusted instance, and I revoked the access token
+        immediately when I was done running the notebook.</p>
+        </blockquote>
+        <p>After logging in, I had access to Weight and Biases to track
+        my model’s training performance. Without those lines, my
+        tracking wouldn’t show up in my Weights and Biases account.</p>
+        <p>Now setting up the training to report information to Weights
+        and Biases was really easy because all I needed to do was update
+        the arguments supplied to the <code>SFTTrainer</code>. This is
+        because <code>SFTTrainer</code> already had built in support for
+        reporting to Weights and Biases.</p>
+        <p>In particular, I needed to add the
+        <code>report_to="wandb"</code> argument to the
+        <code>TraningArguments</code> so that the code:</p>
+        <div class="sourceCode" id="cb9"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>training_args <span class="op">=</span> TrainingArguments(</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    fp16<span class="op">=</span><span class="va">True</span>, <span class="co"># specify bf16=True instead when training on GPUs that support bf16</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    do_eval<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    evaluation_strategy<span class="op">=</span><span class="st">&quot;epoch&quot;</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    gradient_accumulation_steps<span class="op">=</span><span class="dv">128</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    gradient_checkpointing<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    gradient_checkpointing_kwargs<span class="op">=</span>{<span class="st">&quot;use_reentrant&quot;</span>: <span class="va">False</span>},</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    learning_rate<span class="op">=</span><span class="fl">2.0e-05</span>,</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    log_level<span class="op">=</span><span class="st">&quot;info&quot;</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    logging_steps<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    logging_strategy<span class="op">=</span><span class="st">&quot;steps&quot;</span>,</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    lr_scheduler_type<span class="op">=</span><span class="st">&quot;cosine&quot;</span>,</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=-</span><span class="dv">1</span>,</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    num_train_epochs<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    output_dir<span class="op">=</span>output_dir,</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>    overwrite_output_dir<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>    per_device_eval_batch_size<span class="op">=</span><span class="dv">1</span>, <span class="co"># originally set to 8</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    per_device_train_batch_size<span class="op">=</span><span class="dv">1</span>, <span class="co"># originally set to 8</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    <span class="co"># push_to_hub=True,</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># hub_model_id=&quot;zephyr-7b-sft-lora&quot;,</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># hub_strategy=&quot;every_save&quot;,</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># report_to=&quot;tensorboard&quot;,</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    save_strategy<span class="op">=</span><span class="st">&quot;no&quot;</span>,</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    save_total_limit<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">42</span>,</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+        <p>became</p>
+        <div class="sourceCode" id="cb10"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>training_args <span class="op">=</span> TrainingArguments(</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    fp16<span class="op">=</span><span class="va">True</span>, <span class="co"># specify bf16=True instead when training on GPUs that support bf16</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    do_eval<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    evaluation_strategy<span class="op">=</span><span class="st">&quot;epoch&quot;</span>,</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    gradient_accumulation_steps<span class="op">=</span><span class="dv">128</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    gradient_checkpointing<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    gradient_checkpointing_kwargs<span class="op">=</span>{<span class="st">&quot;use_reentrant&quot;</span>: <span class="va">False</span>},</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    learning_rate<span class="op">=</span><span class="fl">2.0e-05</span>,</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    log_level<span class="op">=</span><span class="st">&quot;info&quot;</span>,</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    logging_steps<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    logging_strategy<span class="op">=</span><span class="st">&quot;steps&quot;</span>,</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    lr_scheduler_type<span class="op">=</span><span class="st">&quot;cosine&quot;</span>,</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    max_steps<span class="op">=-</span><span class="dv">1</span>,</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    num_train_epochs<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>    output_dir<span class="op">=</span>output_dir,</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>    overwrite_output_dir<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    per_device_eval_batch_size<span class="op">=</span><span class="dv">1</span>, <span class="co"># originally set to 8</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    per_device_train_batch_size<span class="op">=</span><span class="dv">1</span>, <span class="co"># originally set to 8</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>    <span class="co"># push_to_hub=True,</span></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># hub_model_id=&quot;zephyr-7b-sft-lora&quot;,</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># hub_strategy=&quot;every_save&quot;,</span></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># report_to=&quot;tensorboard&quot;,</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>    save_strategy<span class="op">=</span><span class="st">&quot;no&quot;</span>,</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>    save_total_limit<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>    seed<span class="op">=</span><span class="dv">42</span>,</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>    report_to<span class="op">=</span><span class="st">&quot;wandb&quot;</span> <span class="co"># &lt;--- This argument was added</span></span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+        <h2 id="setting-up-the-training-data">Setting Up the Training
+        Data</h2>
+        <p>The original notebook had the following line to load the
+        training data:</p>
+        <div class="sourceCode" id="cb11"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datasets <span class="im">import</span> load_dataset</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># based on config</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>raw_datasets <span class="op">=</span> load_dataset(<span class="st">&quot;HuggingFaceH4/ultrachat_200k&quot;</span>)</span></code></pre></div>
+        <p>The <code>raw_datasets</code> is a dictionary with key
+        <code>"train_sft"</code> for the training data and
+        <code>"test_sft"</code> for the test data.</p>
+        <p>They look like the following:</p>
+        <div class="sourceCode" id="cb12"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(raw_datasets[<span class="st">&quot;train_sft&quot;</span>])</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(raw_datasets[<span class="st">&quot;test_sft&quot;</span>])</span></code></pre></div>
+        <pre><code>Dataset({
+    features: [&#39;prompt&#39;, &#39;prompt_id&#39;, &#39;messages&#39;],
+    num_rows: 207865
+})
+Dataset({
+    features: [&#39;prompt&#39;, &#39;prompt_id&#39;, &#39;messages&#39;],
+    num_rows: 23110
+})</code></pre>
+        <p>After just training on a few hundred rows of the dataset to
+        make sure there weren’t any major problems with the code or
+        things that I forgot, I tried to train on the entire
+        dataset.</p>
+        <p>I started the training and after coming back a while later
+        later and looking at the progress, I realized that it would take
+        too long to train the entire dataset (a very rough back of the
+        envelope calculation showed it could take around 50 hours).</p>
+        <p>Thus, based on that, I decided just to train on part of the
+        dataset to get a feel for supervised fine tuning. In particular,
+        noticing the sizes below:</p>
+        <div class="sourceCode" id="cb14"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(raw_datasets[<span class="st">&quot;train_sft&quot;</span>].num_rows<span class="op">/</span><span class="dv">20</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(raw_datasets[<span class="st">&quot;test_sft&quot;</span>].num_rows<span class="op">/</span><span class="dv">10</span>)</span></code></pre></div>
+        <pre><code>10393.25
+2311.0</code></pre>
+        <p>would only take a few hours, I decided to use 1/20th the
+        training data and 1/10th the test data.</p>
+        <p>Thus I changed the code:</p>
+        <div class="sourceCode" id="cb16"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datasets <span class="im">import</span> DatasetDict</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="co"># remove this when done debugging</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>indices <span class="op">=</span> <span class="bu">range</span>(<span class="dv">0</span>,<span class="dv">100</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>dataset_dict <span class="op">=</span> {<span class="st">&quot;train&quot;</span>: raw_datasets[<span class="st">&quot;train_sft&quot;</span>].select(indices),</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;test&quot;</span>: raw_datasets[<span class="st">&quot;test_sft&quot;</span>].select(indices)}</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>raw_datasets <span class="op">=</span> DatasetDict(dataset_dict)</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>raw_datasets</span></code></pre></div>
+        <p>to</p>
+        <div class="sourceCode" id="cb17"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datasets <span class="im">import</span> DatasetDict</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>train_num_rows <span class="op">=</span> raw_datasets[<span class="st">&quot;train_sft&quot;</span>].num_rows</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>test_num_rows <span class="op">=</span> raw_datasets[<span class="st">&quot;test_sft&quot;</span>].num_rows</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>train_indices <span class="op">=</span> <span class="bu">range</span>(<span class="dv">0</span>, train_num_rows<span class="op">//</span><span class="dv">20</span>) <span class="co"># &lt;-- this line is new</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>test_indices <span class="op">=</span> <span class="bu">range</span>(<span class="dv">0</span>, test_num_rows<span class="op">//</span><span class="dv">10</span>) <span class="co"># &lt;-- this line is new</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>dataset_dict <span class="op">=</span> {<span class="st">&quot;train&quot;</span>: raw_datasets[<span class="st">&quot;train_sft&quot;</span>].select(train_indices),</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;test&quot;</span>: raw_datasets[<span class="st">&quot;test_sft&quot;</span>].select(test_indices)}</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>raw_datasets <span class="op">=</span> DatasetDict(dataset_dict)</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>raw_datasets</span></code></pre></div>
+        <h2 id="training">Training</h2>
+        <p>With the above changes I could train the model with the
+        following:</p>
+        <div class="sourceCode" id="cb18"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>train_result <span class="op">=</span> trainer.train()</span></code></pre></div>
+        <p>After about 3 hours and 30 minutes, the training was done,
+        and I had a training loss of 1.076600 and a validation loss of
+        1.072933. The compute I purchased was about $0.40/hr (USD) and
+        so the cost for training was about $1.40 (USD).</p>
+        <p>The results from Weights and Biases is shown below:</p>
+        <figure>
+        <img src="./images/wandb.png"
+        alt="Weights and Baises Results" />
+        <figcaption aria-hidden="true">Weights and Baises
+        Results</figcaption>
+        </figure>
+        <p>Now the training loss decreased then increased and later
+        decreased again. Also, the validation loss is smaller than the
+        training loss. These both indicate that the training didn’t go
+        as expected. In particular, I would expect the training loss to
+        keep decreasing.</p>
+        <p>An investigation into the training process and how to improve
+        it will have to wait though for another post. Right now, I want
+        to see what the model does in this state.</p>
+        <h2 id="saving-the-model">Saving the Model</h2>
+        <p>To save the model I used the following code with one added
+        line:</p>
+        <div class="sourceCode" id="cb19"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>metrics <span class="op">=</span> train_result.metrics</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>metrics[<span class="st">&quot;train_samples&quot;</span>] <span class="op">=</span> <span class="bu">len</span>(train_dataset)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>trainer.log_metrics(<span class="st">&quot;train&quot;</span>, metrics)</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>trainer.save_metrics(<span class="st">&quot;train&quot;</span>, metrics)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>trainer.save_state()</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>trainer.save_model(output_dir <span class="op">=</span> output_dir) <span class="co"># &lt;-- this line is new</span></span></code></pre></div>
+        <p>A previous cell in the original notebook had defined:</p>
+        <div class="sourceCode" id="cb20"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>output_dir <span class="op">=</span> <span class="st">&#39;data/zephyr-7b-sft-lora&#39;</span></span></code></pre></div>
+        <p>Now lets look at the output directory:</p>
+        <pre><code>!ls data/zephyr-7b-sft-lora</code></pre>
+        <pre><code>README.md                   special_tokens_map.json      trainer_state.json
+adapter_config.json         tokenizer.json               training_args.bin
+adapter_model.safetensors   tokenizer_config.json
+all_results.json            train_results.json</code></pre>
+        <p>Without the line
+        <code>trainer.save_model(output_dir = output_dir)</code> the
+        output directory wouldn’t contain all of the configuration files
+        needed to load the model. That is, model saving would succeed
+        but model loading would fail.</p>
+        <h2 id="loading-the-model">Loading the Model</h2>
+        <p>Loading the model was straightforward using the code from the
+        original notebook:</p>
+        <div class="sourceCode" id="cb23"><pre
+        class="sourceCode python"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoTokenizer, AutoModelForCausalLM</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(output_dir)</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> AutoModelForCausalLM.from_pretrained(output_dir, load_in_4bit<span class="op">=</span><span class="va">True</span>, device_map<span class="op">=</span><span class="st">&quot;auto&quot;</span>)</span></code></pre></div>
+        <p>Notice that the <code>output_dir</code> was given to specify
+        where to load the model from.</p>
+        <h2 id="running-the-model">Running the Model</h2>
+        <p>With the model loaded I could now run the model:</p>
+        <pre class="pthon"><code>import torch
+
+# We use the tokenizer&#39;s chat template to format each message - see https://huggingface.co/docs/transformers/main/en/chat_templating
+messages = [
+    {
+        &quot;role&quot;: &quot;system&quot;,
+        &quot;content&quot;: &quot;You are a friendly chatbot who always responds in the style of a pirate&quot;,
+    },
+    {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;How many helicopters can a human eat in one sitting?&quot;},
+]
+
+# prepare the messages for the model
+input_ids = tokenizer.apply_chat_template(messages, truncation=True, add_generation_prompt=True, return_tensors=&quot;pt&quot;).to(&quot;cuda&quot;)
+
+# inference
+outputs = model.generate(
+        input_ids=input_ids,
+        max_new_tokens=256,
+        do_sample=True,
+        temperature=0.7,
+        top_k=50,
+        top_p=0.95
+)
+print(tokenizer.batch_decode(outputs, skip_special_tokens=True)[0])</code></pre>
+        <pre><code>The attention mask and the pad token id were not set. As a consequence, you may observe unexpected behavior. Please pass your input&#39;s `attention_mask` to obtain reliable results.
+Setting `pad_token_id` to `eos_token_id`:2 for open-end generation.
+/opt/conda/lib/python3.10/site-packages/bitsandbytes/nn/modules.py:426: UserWarning: Input type into Linear4bit is torch.float16, but bnb_4bit_compute_dtype=torch.float32 (default). This will lead to slow inference or training speed.
+  warnings.warn(
+&lt;|system|&gt;
+You are a friendly chatbot who always responds in the style of a pirate 
+&lt;|user|&gt;
+How many helicopters can a human eat in one sitting? 
+&lt;|assistant|&gt;
+Arr matey! A human can eat a lot of helicopters in one sitting. I&#39;m not sure how many exactly, but it&#39;s a lot.</code></pre>
+        <p>Even with the training not being as good as it could be, the
+        model does produce what seems like a good result for this
+        particular example. Now to really test the model, real
+        benchmarking needs to be done that is carefully designed.
+        However, that is for another post.</p>
+        <h2 id="conclusion">Conclusion</h2>
+        <p>In this document I replicated the supervised fine tuning from
+        the HuggingFace article <a
+        href="https://colab.research.google.com/drive/1WNSVtM82oknmzL1QrJlNu--yNaWbp6o9?usp=sharing&amp;utm_campaign=Events%20Follow%20Up&amp;utm_source=hs_email&amp;utm_medium=email&amp;_hsenc=p2ANqtz--zYcYKj9_o5fLbt_D3P4tzLanpAyfFm14Z2NXEvCZxbsjLtax9y5mYCzRg-opvXZhsYGEH#scrollTo=7F9-BH4g9sr9">Supervised
+        fine-tuning (SFT) of an LLM</a>. A few changes were needed for
+        me to get the code to work, and I also added observability with
+        Weights and Biases.</p>
+        <p>Future work involves debugging the trainer to see why my
+        training loss wasn’t always decreasing. When that is fixed, and
+        I have a trained model I am satisfied with, I can move onto the
+        article <a
+        href="https://colab.research.google.com/drive/1mWiOFBy3zY6OdINEvHN9EPoQ_VIvfFKw?usp=sharing&amp;utm_campaign=Events%20Follow%20Up&amp;utm_source=hs_email&amp;utm_medium=email&amp;_hsenc=p2ANqtz--zYcYKj9_o5fLbt_D3P4tzLanpAyfFm14Z2NXEvCZxbsjLtax9y5mYCzRg-opvXZhsYGEH">Human
+        preference fine-tuning using direct preference optimization
+        (DPO) of an LLM</a> to perform Direct Preference Optimization
+        (DPO) on the model.</p>
+    </div>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&amp;family=Inconsolata:wght@200..900&amp;display=swap" rel="stylesheet">
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        function isElementInView(el) {
+            const rect = el.getBoundingClientRect();
+            return (
+                rect.top >= 0 &&
+                rect.left >= 0 &&
+                rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+            );
+        }
+
+        function onIntersection(entries, opts) {
+          let topElement = null;
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              const top = entry.boundingClientRect.top;
+              if (topElement === null || top < topElement.clientTop) {
+                topElement = entry.target;
+              }
+            }
+          }
+
+          if (topElement === null) {
+            return;
+          }
+
+          const navPanel = document.getElementById('navPanel');
+          if (!navPanel) {
+            return;
+          }
+
+          const tocElement = document.getElementById('toc-' + topElement.id);
+          if (!tocElement) {
+            return;
+          }
+
+          const anchors = navPanel.getElementsByTagName('a');
+          for (let i=0; i<anchors.length; i++) {
+            const a = anchors[i];
+            a.classList.remove('selected');
+          }
+
+          tocElement.classList.add('selected');
+          if (!isElementInView(tocElement)) {
+            tocElement.scrollIntoView();
+          }
+        }
+
+        const observer = new IntersectionObserver(onIntersection, {
+          root: null,
+          threshold: 0.5,
+        });
+
+        for (const tag of ['h1', 'h2', 'h3', 'h4']) {
+          const elements = document.getElementsByTagName(tag);
+          for (let i=0; i<elements.length; i++) {
+            const element = elements.item(i);
+            observer.observe(element);
+          }
+        }
+
+        observer.observe(document.getElementById('root'));
+      });
+    </script>
+  </body>
+</html>

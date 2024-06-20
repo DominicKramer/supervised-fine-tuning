@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/png" href="./images/mlg-logo.png">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content="Supervised Fine Tuning Mistral 7B">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    <title>Supervised Fine Tuning Mistral 7B</title>
+    <link rel="stylesheet" href="./styles.css">
+
+    <script>
+      function openNav() {
+          document.getElementById("navPanel").style.width = "275px";
+          document.getElementById("navPanel").style.paddingRight = "10px";
+          document.getElementById("mainContent").style.paddingLeft = "300px";
+          document.getElementById("openNavBtn").style.display = "none";
+          document.getElementById("openNavBtn").style.marginLeft = "-2em";
+      }
+  
+      function closeNav() {
+          document.getElementById("navPanel").style.width = "0";
+          document.getElementById("navPanel").style.paddingRight = "0";
+          document.getElementById("mainContent").style.paddingLeft = "0";
+          document.getElementById("openNavBtn").style.display = "block";
+          setTimeout(() => {
+            document.getElementById("openNavBtn").style.marginLeft = "0";
+          }, 0.5*0.3*1000 /* sec */);
+      }
+
+      document.addEventListener("DOMContentLoaded", function() {
+        const navPanel = document.getElementById('navPanel');
+        if (!navPanel) {
+          return;
+        }
+        const anchors = navPanel.getElementsByTagName('a');
+        for (let i=0; i<anchors.length; i++) {
+          const target = anchors[i];
+          target.onclick = () => {
+            const navPanel = document.getElementById('navPanel');
+            if (!navPanel) {
+              return;
+            }
+            const anchors = navPanel.getElementsByTagName('a');
+            for (let i=0; i<anchors.length; i++) {
+              const a = anchors[i];
+              a.classList.remove('selected');
+            }
+            target.classList.add('selected');
+
+            if (window.innerWidth <= 600) {
+              closeNav();
+            }
+          };
+        }
+      });
+    </script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" integrity="sha384-wcIxkf4k558AjM3Yz3BBFQUbk/zgIYC2R0QpeeYb+TwlBVMrlgLqwRjRtGZiK7ww" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" integrity="sha384-hIoBPJpTUs74ddyc4bFZSM1TVlQDA60VBbJS0oA934VSz82sBx1X7kSx2ATBDIyd" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js" integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+              // customised options
+              // • auto-render specific keys, e.g.:
+              delimiters: [
+                  {left: '$$$$', right: '$$$$', display: true},
+                  {left: '$$', right: '$$', display: false},
+                  {left: '\\(', right: '\\)', display: false},
+                  {left: '\\[', right: '\\]', display: true}
+              ],
+              // • rendering keys, e.g.:
+              throwOnError : false,
+            });
+        });
+    </script>
+  </head>
+  <body>
+    <nav id="navPanel">
+      <button class="closeBtn" onclick="closeNav()">&times;</button>
+      $toc$
+    </nav>
+  
+    <div id="mainContent">
+        <button id="openNavBtn" onclick="openNav()">&#9776;</button>
+        $body$
+    </div>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&amp;family=Inconsolata:wght@200..900&amp;display=swap" rel="stylesheet">
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        function isElementInView(el) {
+            const rect = el.getBoundingClientRect();
+            return (
+                rect.top >= 0 &&
+                rect.left >= 0 &&
+                rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+            );
+        }
+
+        function onIntersection(entries, opts) {
+          let topElement = null;
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              const top = entry.boundingClientRect.top;
+              if (topElement === null || top < topElement.clientTop) {
+                topElement = entry.target;
+              }
+            }
+          }
+
+          if (topElement === null) {
+            return;
+          }
+
+          const navPanel = document.getElementById('navPanel');
+          if (!navPanel) {
+            return;
+          }
+
+          const tocElement = document.getElementById('toc-' + topElement.id);
+          if (!tocElement) {
+            return;
+          }
+
+          const anchors = navPanel.getElementsByTagName('a');
+          for (let i=0; i<anchors.length; i++) {
+            const a = anchors[i];
+            a.classList.remove('selected');
+          }
+
+          tocElement.classList.add('selected');
+          if (!isElementInView(tocElement)) {
+            tocElement.scrollIntoView();
+          }
+        }
+
+        const observer = new IntersectionObserver(onIntersection, {
+          root: null,
+          threshold: 0.5,
+        });
+
+        for (const tag of ['h1', 'h2', 'h3', 'h4']) {
+          const elements = document.getElementsByTagName(tag);
+          for (let i=0; i<elements.length; i++) {
+            const element = elements.item(i);
+            observer.observe(element);
+          }
+        }
+
+        observer.observe(document.getElementById('root'));
+      });
+    </script>
+  </body>
+</html>
